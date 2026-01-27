@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시가총액 순위 | 전세계 자산</title>
+    <meta name="description" content="전세계 자산 시가총액 순위 - 주식, 암호화폐, 귀금속 포함">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background: #0a0a0a; }
+        .asset-row:hover { background-color: #1a1a1a; }
+        .positive { color: #22c55e; }
+        .negative { color: #ef4444; }
+        .filter-btn.active { background-color: #3b82f6; color: white; }
+        .precious-metal { background-color: rgba(234, 179, 8, 0.1); }
+        .cryptocurrency { background-color: rgba(168, 85, 247, 0.1); }
+        .sparkline { height: 40px; }
+        .logo-fallback { 
+            width: 32px; height: 32px; 
+            border-radius: 50%; 
+            background: linear-gradient(135deg, #374151, #1f2937);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: bold; color: #9ca3af;
+        }
+    </style>
+</head>
+<body class="text-gray-100">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-white mb-2">🌍 전세계 자산 시가총액 순위</h1>
+            <p class="text-gray-400">상장기업 / 귀금속 / 암호화폐 포함</p>
+            <p class="text-xs text-gray-500 mt-2">📅 마지막 업데이트: 2026-01-27</p>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                <div class="text-2xl font-bold text-white" id="total-count">-</div>
+                <div class="text-sm text-gray-400">총 자산</div>
+            </div>
+            <div class="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                <div class="text-2xl font-bold text-yellow-400" id="metal-count">-</div>
+                <div class="text-sm text-gray-400">귀금속</div>
+            </div>
+            <div class="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                <div class="text-2xl font-bold text-blue-400" id="stock-count">-</div>
+                <div class="text-sm text-gray-400">주식</div>
+            </div>
+            <div class="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                <div class="text-2xl font-bold text-purple-400" id="crypto-count">-</div>
+                <div class="text-sm text-gray-400">암호화폐</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="flex gap-2 mb-6 flex-wrap">
+            <button class="filter-btn active px-4 py-2 rounded-full text-sm font-medium bg-gray-800 hover:bg-gray-700 transition" data-filter="all">전체</button>
+            <button class="filter-btn px-4 py-2 rounded-full text-sm font-medium bg-gray-800 hover:bg-gray-700 transition" data-filter="stock">🏢 주식</button>
+            <button class="filter-btn px-4 py-2 rounded-full text-sm font-medium bg-gray-800 hover:bg-gray-700 transition" data-filter="metal">🥇 귀금속</button>
+            <button class="filter-btn px-4 py-2 rounded-full text-sm font-medium bg-gray-800 hover:bg-gray-700 transition" data-filter="crypto">🪙 암호화폐</button>
+        </div>
+
+        <!-- Search -->
+        <div class="mb-6">
+            <input type="text" id="search-input" placeholder="자산 검색..." 
+                   class="w-full md:w-80 px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+        </div>
+
+        <!-- Table -->
+        <div class="bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-800">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-gray-800">
+                            <th class="text-left py-4 px-4 text-sm font-semibold text-gray-400 w-16">순위</th>
+                            <th class="text-left py-4 px-4 text-sm font-semibold text-gray-400">이름</th>
+                            <th class="text-right py-4 px-4 text-sm font-semibold text-gray-400 cursor-pointer hover:text-white" onclick="sortBy('marketCap')">
+                                시가총액 ↓
+                            </th>
+                            <th class="text-right py-4 px-4 text-sm font-semibold text-gray-400">가격</th>
+                            <th class="text-right py-4 px-4 text-sm font-semibold text-gray-400 cursor-pointer hover:text-white" onclick="sortBy('change24h')">
+                                24시간
+                            </th>
+                            <th class="text-center py-4 px-4 text-sm font-semibold text-gray-400 w-32">7일 차트</th>
+                            <th class="text-center py-4 px-4 text-sm font-semibold text-gray-400 w-28">국가/유형</th>
+                        </tr>
+                    </thead>
+                    <tbody id="assets-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex justify-center gap-2 mt-6" id="pagination">
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 p-6 bg-gray-900 rounded-xl border border-gray-800">
+            <h2 class="text-lg font-semibold mb-4 text-white">📊 시가총액 계산 방식</h2>
+            <div class="grid md:grid-cols-3 gap-4 text-sm">
+                <div class="p-4 bg-yellow-900/20 rounded-lg border border-yellow-800/30">
+                    <h3 class="font-semibold text-yellow-400 mb-2">🥇 금 (Gold)</h3>
+                    <p class="text-yellow-200/70">216,265톤 × 32,150.7oz × 가격</p>
+                    <p class="text-yellow-200/50 text-xs mt-1">World Gold Council 2025</p>
+                </div>
+                <div class="p-4 bg-gray-700/20 rounded-lg border border-gray-600/30">
+                    <h3 class="font-semibold text-gray-300 mb-2">🥈 은 (Silver)</h3>
+                    <p class="text-gray-400">1,751,000톤 × 32,150.7oz × 가격</p>
+                    <p class="text-gray-500 text-xs mt-1">CPM Group Silver Yearbook</p>
+                </div>
+                <div class="p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
+                    <h3 class="font-semibold text-blue-400 mb-2">📈 주식 & 암호화폐</h3>
+                    <p class="text-blue-200/70">발행주식/유통량 × 현재가격</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 text-center text-sm text-gray-600">
+            <p>데이터는 매일 자동 업데이트됩니다</p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // 📦 임베드된 데이터
+        // ============================================
+        const ASSETS_DATA = [{"id": "bitcoin", "name": "Bitcoin", "symbol": "BTC", "price": 102450, "marketCap": 2030000000000, "change24h": 1.25, "change7d": 4.8, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/1/small/bitcoin.png", "sparkline": []}, {"id": "ethereum", "name": "Ethereum", "symbol": "ETH", "price": 3180, "marketCap": 383000000000, "change24h": 2.34, "change7d": 6.2, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/279/small/ethereum.png", "sparkline": []}, {"id": "xrp", "name": "XRP", "symbol": "XRP", "price": 3.12, "marketCap": 180000000000, "change24h": 3.45, "change7d": 12.3, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png", "sparkline": []}, {"id": "tether", "name": "Tether", "symbol": "USDT", "price": 1.0, "marketCap": 137000000000, "change24h": 0.01, "change7d": 0.02, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/325/small/Tether.png", "sparkline": []}, {"id": "solana", "name": "Solana", "symbol": "SOL", "price": 245, "marketCap": 119000000000, "change24h": 4.56, "change7d": 8.9, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/4128/small/solana.png", "sparkline": []}, {"id": "bnb", "name": "BNB", "symbol": "BNB", "price": 695, "marketCap": 100000000000, "change24h": 1.12, "change7d": 3.4, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png", "sparkline": []}, {"id": "dogecoin", "name": "Dogecoin", "symbol": "DOGE", "price": 0.38, "marketCap": 56000000000, "change24h": 5.67, "change7d": 15.2, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/5/small/dogecoin.png", "sparkline": []}, {"id": "usdc", "name": "USD Coin", "symbol": "USDC", "price": 1.0, "marketCap": 52000000000, "change24h": 0.0, "change7d": 0.01, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/6319/small/usdc.png", "sparkline": []}, {"id": "cardano", "name": "Cardano", "symbol": "ADA", "price": 1.02, "marketCap": 36000000000, "change24h": 2.34, "change7d": 5.6, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/975/small/cardano.png", "sparkline": []}, {"id": "tron", "name": "TRON", "symbol": "TRX", "price": 0.24, "marketCap": 21000000000, "change24h": 1.23, "change7d": 3.2, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/1094/small/tron-logo.png", "sparkline": []}, {"id": "avalanche", "name": "Avalanche", "symbol": "AVAX", "price": 38.5, "marketCap": 15800000000, "change24h": 3.21, "change7d": 7.8, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png", "sparkline": []}, {"id": "chainlink", "name": "Chainlink", "symbol": "LINK", "price": 24.5, "marketCap": 15300000000, "change24h": 2.89, "change7d": 6.5, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png", "sparkline": []}, {"id": "sui", "name": "Sui", "symbol": "SUI", "price": 4.85, "marketCap": 14500000000, "change24h": 5.12, "change7d": 12.4, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg", "sparkline": []}, {"id": "stellar", "name": "Stellar", "symbol": "XLM", "price": 0.45, "marketCap": 13500000000, "change24h": 2.34, "change7d": 8.9, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/100/small/Stellar_symbol_black_RGB.png", "sparkline": []}, {"id": "polkadot", "name": "Polkadot", "symbol": "DOT", "price": 7.85, "marketCap": 12000000000, "change24h": 1.89, "change7d": 4.5, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/12171/small/polkadot.png", "sparkline": []}, {"id": "hedera", "name": "Hedera", "symbol": "HBAR", "price": 0.32, "marketCap": 12000000000, "change24h": 4.56, "change7d": 10.2, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/3688/small/hbar.png", "sparkline": []}, {"id": "litecoin", "name": "Litecoin", "symbol": "LTC", "price": 128.5, "marketCap": 9600000000, "change24h": 1.45, "change7d": 3.8, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/2/small/litecoin.png", "sparkline": []}, {"id": "uniswap", "name": "Uniswap", "symbol": "UNI", "price": 14.2, "marketCap": 8500000000, "change24h": 3.12, "change7d": 7.2, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/12504/small/uniswap.png", "sparkline": []}, {"id": "near", "name": "NEAR Protocol", "symbol": "NEAR", "price": 5.45, "marketCap": 6200000000, "change24h": 2.67, "change7d": 5.8, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/10365/small/near.jpg", "sparkline": []}, {"id": "aptos", "name": "Aptos", "symbol": "APT", "price": 9.85, "marketCap": 5200000000, "change24h": 4.23, "change7d": 9.1, "type": "crypto", "country": "-", "image": "https://assets.coingecko.com/coins/images/26455/small/aptos_round.png", "sparkline": []}, {"id": "gold", "name": "금 (Gold)", "symbol": "GOLD", "price": 2950, "marketCap": 20511559849725.0, "change24h": 0.1, "change7d": 0.2, "type": "metal", "country": "-", "emoji": "🥇", "sparkline": []}, {"id": "nvda", "name": "NVIDIA", "symbol": "NVDA", "price": 142.62, "marketCap": 3490000000000.0, "change24h": 2.34, "change7d": 3.51, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/nvidia.com", "sparkline": []}, {"id": "aapl", "name": "Apple", "symbol": "AAPL", "price": 229.86, "marketCap": 3450000000000.0, "change24h": 0.87, "change7d": 1.305, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/apple.com", "sparkline": []}, {"id": "msft", "name": "Microsoft", "symbol": "MSFT", "price": 420.55, "marketCap": 3120000000000.0, "change24h": 1.23, "change7d": 1.845, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/microsoft.com", "sparkline": []}, {"id": "goog", "name": "Alphabet (Google)", "symbol": "GOOG", "price": 192.46, "marketCap": 2350000000000.0, "change24h": -0.45, "change7d": -0.675, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/google.com", "sparkline": []}, {"id": "amzn", "name": "Amazon", "symbol": "AMZN", "price": 222.12, "marketCap": 2320000000000.0, "change24h": 1.56, "change7d": 2.34, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/amazon.com", "sparkline": []}, {"id": "silver", "name": "은 (Silver)", "symbol": "SILVER", "price": 33.0, "marketCap": 1857763898100.0, "change24h": -0.3, "change7d": -0.8999999999999999, "type": "metal", "country": "-", "emoji": "🥈", "sparkline": []}, {"id": "2222.sr", "name": "Saudi Aramco", "symbol": "2222.SR", "price": 27.85, "marketCap": 1850000000000.0, "change24h": 0.22, "change7d": 0.33, "type": "stock", "country": "🇸🇦 사우디", "image": "https://logo.clearbit.com/aramco.com", "sparkline": []}, {"id": "meta", "name": "Meta Platforms", "symbol": "META", "price": 645.23, "marketCap": 1640000000000.0, "change24h": 2.12, "change7d": 3.18, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/meta.com", "sparkline": []}, {"id": "tsla", "name": "Tesla", "symbol": "TSLA", "price": 351.34, "marketCap": 1120000000000.0, "change24h": -1.23, "change7d": -1.845, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/tesla.com", "sparkline": []}, {"id": "brk-b", "name": "Berkshire Hathaway", "symbol": "BRK-B", "price": 502.12, "marketCap": 1080000000000.0, "change24h": 0.34, "change7d": 0.51, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/berkshirehathaway.com", "sparkline": []}, {"id": "tsm", "name": "TSMC", "symbol": "TSM", "price": 189.45, "marketCap": 980000000000.0, "change24h": -0.89, "change7d": -1.335, "type": "stock", "country": "🇹🇼 대만", "image": "https://logo.clearbit.com/tsmc.com", "sparkline": []}, {"id": "avgo", "name": "Broadcom", "symbol": "AVGO", "price": 235.67, "marketCap": 980000000000.0, "change24h": 1.89, "change7d": 2.835, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/broadcom.com", "sparkline": []}, {"id": "wmt", "name": "Walmart", "symbol": "WMT", "price": 92.45, "marketCap": 740000000000.0, "change24h": 0.12, "change7d": 0.18, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/walmart.com", "sparkline": []}, {"id": "lly", "name": "Eli Lilly", "symbol": "LLY", "price": 782.34, "marketCap": 740000000000.0, "change24h": 3.21, "change7d": 4.8149999999999995, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/lilly.com", "sparkline": []}, {"id": "jpm", "name": "JPMorgan Chase", "symbol": "JPM", "price": 252.34, "marketCap": 720000000000.0, "change24h": 0.67, "change7d": 1.0050000000000001, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/jpmorganchase.com", "sparkline": []}, {"id": "v", "name": "Visa", "symbol": "V", "price": 342.67, "marketCap": 650000000000.0, "change24h": 0.45, "change7d": 0.675, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/visa.com", "sparkline": []}, {"id": "ma", "name": "Mastercard", "symbol": "MA", "price": 528.45, "marketCap": 520000000000.0, "change24h": 0.78, "change7d": 1.17, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/mastercard.com", "sparkline": []}, {"id": "orcl", "name": "Oracle", "symbol": "ORCL", "price": 178.9, "marketCap": 490000000000.0, "change24h": 2.34, "change7d": 3.51, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/oracle.com", "sparkline": []}, {"id": "unh", "name": "UnitedHealth", "symbol": "UNH", "price": 512.78, "marketCap": 470000000000.0, "change24h": -0.34, "change7d": -0.51, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/unitedhealthgroup.com", "sparkline": []}, {"id": "cost", "name": "Costco", "symbol": "COST", "price": 945.67, "marketCap": 420000000000.0, "change24h": 0.89, "change7d": 1.335, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/costco.com", "sparkline": []}, {"id": "nvo", "name": "Novo Nordisk", "symbol": "NVO", "price": 98.45, "marketCap": 420000000000.0, "change24h": 0.67, "change7d": 1.0050000000000001, "type": "stock", "country": "🇩🇰 덴마크", "image": "https://logo.clearbit.com/novonordisk.com", "sparkline": []}, {"id": "pg", "name": "Procter & Gamble", "symbol": "PG", "price": 172.56, "marketCap": 410000000000.0, "change24h": 0.45, "change7d": 0.675, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/pg.com", "sparkline": []}, {"id": "hd", "name": "Home Depot", "symbol": "HD", "price": 412.34, "marketCap": 380000000000.0, "change24h": 1.12, "change7d": 1.6800000000000002, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/homedepot.com", "sparkline": []}, {"id": "jnj", "name": "Johnson & Johnson", "symbol": "JNJ", "price": 152.34, "marketCap": 370000000000.0, "change24h": 0.23, "change7d": 0.34500000000000003, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/jnj.com", "sparkline": []}, {"id": "bac", "name": "Bank of America", "symbol": "BAC", "price": 42.56, "marketCap": 330000000000.0, "change24h": 0.56, "change7d": 0.8400000000000001, "type": "stock", "country": "🇺🇸 미국", "image": "https://logo.clearbit.com/bankofamerica.com", "sparkline": []}, {"id": "samsung", "name": "삼성전자", "symbol": "005930", "price": 53200, "marketCap": 318000000000.0, "change24h": -1.2, "change7d": -3.5, "type": "stock", "country": "🇰🇷 한국", "image": "https://logo.clearbit.com/samsung.com", "sparkline": []}, {"id": "asml", "name": "ASML", "symbol": "ASML", "price": 745.23, "marketCap": 300000000000.0, "change24h": 1.45, "change7d": 2.175, "type": "stock", "country": "🇳🇱 네덜란드", "image": "https://logo.clearbit.com/asml.com", "sparkline": []}, {"id": "skhynix", "name": "SK하이닉스", "symbol": "000660", "price": 178500, "marketCap": 130000000000.0, "change24h": -0.8, "change7d": -2.1, "type": "stock", "country": "🇰🇷 한국", "image": "https://logo.clearbit.com/skhynix.com", "sparkline": []}];
+        
+        let currentFilter = 'all';
+        let currentSort = 'marketCap';
+        let sortDirection = 'desc';
+        let currentPage = 1;
+        const perPage = 50;
+        let searchQuery = '';
+
+        // Format functions
+        function formatMarketCap(value) {
+            if (value >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
+            if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
+            if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
+            return `${value.toFixed(2)}`;
+        }
+
+        function formatPrice(value, symbol) {
+            if (symbol === '005930' || symbol === '000660') return `₩${value.toLocaleString()}`;
+            if (value >= 1000) return `${value.toLocaleString('en-US', {maximumFractionDigits: 2})}`;
+            if (value >= 1) return `${value.toFixed(2)}`;
+            if (value >= 0.01) return `${value.toFixed(4)}`;
+            return `${value.toFixed(6)}`;
+        }
+
+        // Create sparkline
+        function createSparkline(data, change7d) {
+            const width = 100;
+            const height = 35;
+            const isPositive = change7d >= 0;
+            const color = isPositive ? '#22c55e' : '#ef4444';
+            
+            if (data && data.length > 10) {
+                // Use actual sparkline data
+                const step = Math.floor(data.length / 20);
+                const sampled = data.filter((_, i) => i % step === 0).slice(-20);
+                const min = Math.min(...sampled);
+                const max = Math.max(...sampled);
+                const range = max - min || 1;
+                
+                const points = sampled.map((val, i) => {
+                    const x = (i / (sampled.length - 1)) * width;
+                    const y = height - 5 - ((val - min) / range) * (height - 10);
+                    return `${x},${y}`;
+                }).join(' ');
+                
+                return `<svg width="${width}" height="${height}" class="sparkline">
+                    <polyline fill="none" stroke="${color}" stroke-width="2" points="${points}" />
+                </svg>`;
+            }
+            
+            // Generate fake sparkline based on change
+            const points = [];
+            for (let i = 0; i < 7; i++) {
+                const progress = i / 6;
+                const y = isPositive 
+                    ? 28 - progress * 18 + (Math.random() - 0.5) * 8
+                    : 10 + progress * 18 + (Math.random() - 0.5) * 8;
+                points.push(`${i * 15 + 5},${Math.max(5, Math.min(30, y))}`);
+            }
+            
+            return `<svg width="${width}" height="${height}" class="sparkline">
+                <polyline fill="none" stroke="${color}" stroke-width="2" points="${points.join(' ')}" />
+            </svg>`;
+        }
+
+        // Get filtered and sorted data
+        function getFilteredData() {
+            let filtered = ASSETS_DATA;
+            
+            if (currentFilter !== 'all') {
+                filtered = filtered.filter(a => a.type === currentFilter);
+            }
+            
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                filtered = filtered.filter(a => 
+                    a.name.toLowerCase().includes(query) || 
+                    a.symbol.toLowerCase().includes(query)
+                );
+            }
+            
+            filtered.sort((a, b) => {
+                const aVal = a[currentSort] || 0;
+                const bVal = b[currentSort] || 0;
+                return sortDirection === 'desc' ? bVal - aVal : aVal - bVal;
+            });
+            
+            return filtered;
+        }
+
+        // Render table
+        function renderTable() {
+            const tbody = document.getElementById('assets-body');
+            tbody.innerHTML = '';
+            
+            const filtered = getFilteredData();
+            const totalPages = Math.ceil(filtered.length / perPage);
+            const start = (currentPage - 1) * perPage;
+            const paged = filtered.slice(start, start + perPage);
+            
+            paged.forEach((asset, index) => {
+                const globalRank = start + index + 1;
+                const rowClass = asset.type === 'metal' ? 'precious-metal' : 
+                               asset.type === 'crypto' ? 'cryptocurrency' : '';
+                
+                const typeLabel = asset.type === 'metal' ? '🏆 귀금속' :
+                                 asset.type === 'crypto' ? '🪙 암호화폐' : asset.country;
+                
+                const row = document.createElement('tr');
+                row.className = `asset-row border-b border-gray-800 ${rowClass}`;
+                
+                const imgHtml = asset.image 
+                    ? `<img src="${asset.image}" alt="${asset.name}" class="w-8 h-8 rounded-full bg-gray-800" onerror="this.outerHTML='<div class=\'logo-fallback\'>${asset.symbol.charAt(0)}</div>'">`
+                    : `<div class="logo-fallback">${asset.emoji || asset.symbol.charAt(0)}</div>`;
+                
+                row.innerHTML = `
+                    <td class="py-4 px-4 text-gray-400 font-medium">${globalRank}</td>
+                    <td class="py-4 px-4">
+                        <div class="flex items-center gap-3">
+                            ${imgHtml}
+                            <div>
+                                <div class="font-semibold text-white">${asset.name}</div>
+                                <div class="text-xs text-gray-500">${asset.symbol}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-4 px-4 text-right font-medium text-white">${formatMarketCap(asset.marketCap)}</td>
+                    <td class="py-4 px-4 text-right text-gray-300">${formatPrice(asset.price, asset.symbol)}</td>
+                    <td class="py-4 px-4 text-right font-medium ${asset.change24h >= 0 ? 'positive' : 'negative'}">
+                        ${asset.change24h >= 0 ? '+' : ''}${asset.change24h.toFixed(2)}%
+                    </td>
+                    <td class="py-4 px-4">
+                        <div class="flex justify-center">
+                            ${createSparkline(asset.sparkline, asset.change7d)}
+                        </div>
+                    </td>
+                    <td class="py-4 px-4 text-center text-sm text-gray-400">${typeLabel}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+            
+            renderPagination(totalPages);
+            updateStats();
+        }
+
+        // Render pagination
+        function renderPagination(totalPages) {
+            const container = document.getElementById('pagination');
+            container.innerHTML = '';
+            
+            if (totalPages <= 1) return;
+            
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.className = `px-3 py-1 rounded ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`;
+                btn.textContent = i;
+                btn.onclick = () => { currentPage = i; renderTable(); };
+                container.appendChild(btn);
+            }
+        }
+
+        // Update stats
+        function updateStats() {
+            document.getElementById('total-count').textContent = ASSETS_DATA.length;
+            document.getElementById('metal-count').textContent = ASSETS_DATA.filter(a => a.type === 'metal').length;
+            document.getElementById('stock-count').textContent = ASSETS_DATA.filter(a => a.type === 'stock').length;
+            document.getElementById('crypto-count').textContent = ASSETS_DATA.filter(a => a.type === 'crypto').length;
+        }
+
+        // Sort function
+        function sortBy(field) {
+            if (currentSort === field) {
+                sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                currentSort = field;
+                sortDirection = 'desc';
+            }
+            currentPage = 1;
+            renderTable();
+        }
+
+        // Initialize
+        renderTable();
+        
+        // Filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                currentPage = 1;
+                renderTable();
+            });
+        });
+        
+        // Search
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            currentPage = 1;
+            renderTable();
+        });
+    </script>
+</body>
+</html>
